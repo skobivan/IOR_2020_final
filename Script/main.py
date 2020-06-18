@@ -164,7 +164,6 @@ class Robot(object):
         time.sleep(0.7)
         self.auv.set_motor_power(0, 0)
         self.auv.set_motor_power(1, 0)
-        self.speed = 0
 
     def center_basket(self):
         
@@ -172,7 +171,7 @@ class Robot(object):
         if ans:
             self.stop_yaw()
             error = 100.0
-            while not (150 < x < 170 and 110 < y < 130):
+            while not 110 < y < 130:
                 self.bottom_cam.update_img(self.auv.get_image_bottom())
                 (ans, (x, y)) = self.bottom_cam.detect_basket()
                 try:
@@ -193,29 +192,70 @@ class Robot(object):
             self.yaw = self.auv.get_yaw()
             return False
 
+    def go_to_pinger(self, id):
+        time.sleep(2)
+        error, _ = self.auv.get_pinger_data(id)
+        self.yaw = clamp_angle(self.auv.get_yaw() + error)
+        while not self.is_yaw_stable(self.yaw):
+            self.keep_depth(self.depth)
+            self.keep_yaw(self.yaw, 0)
+        is_it_that_pinger = True
+        while True:
+            
+            self.bottom_cam.update_img(self.auv.get_image_bottom())
+            ans, _ = self.bottom_cam.detect_basket()
+            # print('Ans:', ans, 'flg:', is_it_that_pinger)
+            if ans and is_it_that_pinger:
+                self.stop_yaw()
+                time.sleep(2)
+                _, dst = self.auv.get_pinger_data(id)
+                print(dst)
+                if dst < 2.5:
+                    self.center_basket()
+                    break
+                else:
+                    is_it_that_pinger = False
+            elif not ans:
+                is_it_that_pinger = True
+            self.keep_yaw(self.yaw, self.speed)
+            self.keep_depth(self.depth)
+
     def logic(self):
-        self.depth = 2
         self.bottom_cam.update_img(self.auv.get_image_bottom())
-        (ans, (x, y)) = self.bottom_cam.detect_basket()
-        if self.center_basket():
-            print(True)
-            while True:
-                pass
-        print(False)
-        self.keep_yaw(self.yaw, 20)
+
+        if self.state == 0:
+            for pinger_id in range(4):
+                print('State 0 pinger ', pinger_id)
+                self.go_to_pinger(pinger_id)
+                ans, _ = self.bottom_cam.detect()
+                if ans == 'Circle':
+                    self.auv.drop()
+                elif ans == 'Triangle':
+                    self.tr_id = pinger_id
+            self.state += 1
+            self.stop_yaw()
+        if self.state == 1:
+            print('State 1 triangle id ', self.tr_id)
+            if self.tr_id != 3:
+                self.go_to_pinger(self.tr_id)
+            self.state += 1
+            self.depth = 0
+            self.speed = 5
+        self.keep_yaw(self.yaw, self.speed)
         self.keep_depth(self.depth)
 
-        
-
-
-KP_YAW = 0.3
-KD_YAW = 40
+KP_YAW = 0.5
+KD_YAW = 50
 
 KP_DEPTH = 40
 KD_DEPTH = 100
 
-robot = Robot(KP_YAW, KD_YAW, KP_DEPTH, KD_DEPTH)
+SPEED = 20
 
+robot = Robot(KP_YAW, KD_YAW, KP_DEPTH, KD_DEPTH)
+robot.depth = 2
+robot.speed = SPEED
+time.sleep(2)
 while True:
     # robot.keep_depth(2)
     # robot.keep_yaw(50, 0)
