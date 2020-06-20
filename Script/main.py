@@ -64,8 +64,8 @@ class CameraBottom(Camera):
         self.hsv_mask_min_green = (40, 40, 20)
         self.hsv_mask_max_green = (80, 255, 255)   
         
-        self.hsv_mask_min_violet = (130, 20, 0)
-        self.hsv_mask_max_violet = (150, 255, 230)
+        self.hsv_mask_min_violet = (130, 10, 0)
+        self.hsv_mask_max_violet = (150, 255, 240)
         
         super(CameraBottom, self).__init__()
     
@@ -208,9 +208,14 @@ class Robot(object):
         while not self.is_yaw_stable(self.yaw):
             self.keep_depth(self.depth)
             self.keep_yaw(self.yaw, 0)
-        is_it_that_pinger = True
-        while True:
+            time.sleep(0.03)
             
+        print("Find pinger ", self.yaw)
+        is_it_that_pinger = True
+        
+        while True:
+            time.sleep(0.03)
+#            ans = False
             self.bottom_cam.update_img(self.auv.get_image_bottom())
             ans, _ = self.bottom_cam.detect_basket()
             # print('Ans:', ans, 'flg:', is_it_that_pinger)
@@ -226,11 +231,12 @@ class Robot(object):
                     is_it_that_pinger = False
             elif not ans:
                 is_it_that_pinger = True
+                
             self.keep_yaw(self.yaw, self.speed)
             self.keep_depth(self.depth)
 
     def logic(self):
-        self.bottom_cam.update_img(self.auv.get_image_bottom())
+        #self.bottom_cam.update_img(self.auv.get_image_bottom())
 
         if self.state == 0:
             for pinger_id in range(4):
@@ -254,15 +260,15 @@ class Robot(object):
                 self.go_to_pinger(self.tr_id)
             self.state += 1
             self.depth = 0
-            self.speed = 5
+            self.speed = 3
         self.keep_yaw(self.yaw, self.speed)
         self.keep_depth(self.depth)
 
-KP_YAW = 0.02
-KD_YAW = 0
+KP_YAW = 0.4
+KD_YAW = 40
 
-KP_DEPTH = 5
-KD_DEPTH = 0
+KP_DEPTH = 20
+KD_DEPTH = 100
 
 SPEED = 20
 
@@ -274,3 +280,4 @@ while True:
     # robot.keep_depth(2)
     # robot.keep_yaw(50, 0)
     robot.logic()
+    
