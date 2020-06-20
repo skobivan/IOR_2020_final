@@ -62,14 +62,21 @@ class CameraBottom(Camera):
         self.hsv_mask_max_red = (15, 255, 255)
 
         self.hsv_mask_min_green = (40, 40, 20)
-        self.hsv_mask_max_green = (80, 255, 255)
+        self.hsv_mask_max_green = (80, 255, 255)   
+        
+        self.hsv_mask_min_violet = (130, 20, 0)
+        self.hsv_mask_max_violet = (150, 255, 230)
         
         super(CameraBottom, self).__init__()
     
     def detect_basket(self):
         copy_img = self.curr_image.copy()
-        hsv_img = cv.cvtColor(self.curr_image, cv.COLOR_BGR2HSV)    
-        mask = cv.inRange(hsv_img, self.hsv_mask_min_green, self.hsv_mask_max_green)    
+        hsv_img = cv.cvtColor(self.curr_image, cv.COLOR_BGR2HSV)
+        mask1 = cv.inRange(hsv_img, self.hsv_mask_min_green, self.hsv_mask_max_green)
+        mask2 = cv.inRange(hsv_img, self.hsv_mask_min_red, self.hsv_mask_max_red)
+        mask3 = cv.inRange(hsv_img, self.hsv_mask_min_violet, self.hsv_mask_max_violet)
+
+        mask = mask1 + mask2 + mask3   
 
         cnt, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
         answer = False
@@ -85,7 +92,7 @@ class CameraBottom(Camera):
                 cv.drawContours(copy_img, [c], 0, (255, 255, 255), 3)
                 cv.circle(copy_img, coords, 5, (0, 0, 0), 2)
         
-        cv.imshow('detect_basket', copy_img)
+        cv.imshow('detect_basket', mask)
         cv.waitKey(5)
         
         return answer, coords
@@ -134,6 +141,8 @@ class Robot(object):
         self.yaw = 0
         self.depth = 2
         self.speed = 0
+        self.circles = 0
+        self.is_tr = False
 
     def is_depth_stable(self, val):
         return abs(self.auv.get_depth()-val) <= 1e-2
@@ -230,10 +239,15 @@ class Robot(object):
                 ans, _ = self.bottom_cam.detect()
                 if ans == 'Circle':
                     self.auv.drop()
+                    self.circles += 1
                 elif ans == 'Triangle':
                     self.tr_id = pinger_id
+                    self.is_tr = True
+                if self.circles == 2 and self.is_tr:
+                    break
             self.state += 1
             self.stop_yaw()
+            
         if self.state == 1:
             print('State 1 triangle id ', self.tr_id)
             if self.tr_id != 3:
@@ -244,11 +258,11 @@ class Robot(object):
         self.keep_yaw(self.yaw, self.speed)
         self.keep_depth(self.depth)
 
-KP_YAW = 0.5
-KD_YAW = 50
+KP_YAW = 0.02
+KD_YAW = 0
 
-KP_DEPTH = 40
-KD_DEPTH = 100
+KP_DEPTH = 5
+KD_DEPTH = 0
 
 SPEED = 20
 
